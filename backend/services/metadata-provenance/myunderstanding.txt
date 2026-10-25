@@ -1,0 +1,4 @@
+Required escape slash path at post 8001/analysis
+{
+  "image_path": "C:\\Users\\Administrator\\Downloads\\ImForensic-VSCode-Starter\\ImForensic\\backend\\api-gateway\\temp_uploads\\2dded403-35b8-4263-b2b1-0e3d957c7673.jpg"
+}

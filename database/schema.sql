@@ -1,0 +1,1 @@
+-- See infrastructure/postgres/init.sql for the starter schema.

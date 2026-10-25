@@ -1,0 +1,127 @@
+# ==========================================
+# Python
+# ==========================================
+__pycache__/
+*.py[cod]
+*$py.class
+.python-version
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Python packaging
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Testing and coverage
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.nox/
+.coverage
+.coverage.*
+htmlcov/
+
+# ==========================================
+# Environment variables and secrets
+# ==========================================
+.env
+.env.*
+!.env.example
+
+# ==========================================
+# Uploaded images and temporary analysis data
+# ==========================================
+backend/api-gateway/temp_uploads/
+backend/**/temp_uploads/
+uploads/
+temp/
+tmp/
+*.tmp
+*.log
+
+# ==========================================
+# Image files
+# ==========================================
+# Uncomment these if you never want image files in Git
+# *.jpg
+# *.jpeg
+# *.png
+# *.webp
+# *.tif
+# *.tiff
+# *.bmp
+# *.gif
+
+# ==========================================
+# Machine learning model weights
+# ==========================================
+*.pt
+*.pth
+*.onnx
+*.safetensors
+*.h5
+*.hdf5
+*.pb
+*.pkl
+*.joblib
+
+# ==========================================
+# Data and local databases
+# ==========================================
+*.sqlite
+*.sqlite3
+*.db
+data/raw/
+data/processed/
+
+# ==========================================
+# Frontend - Node.js / React / Vite
+# ==========================================
+node_modules/
+frontend/node_modules/
+frontend/dist/
+frontend/build/
+frontend/.env
+frontend/.env.*
+!frontend/.env.example
+
+# ==========================================
+# Logs and runtime files
+# ==========================================
+logs/
+*.pid
+*.seed
+*.pid.lock
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# ==========================================
+# Docker and local overrides
+# ==========================================
+.env.docker
+docker-compose.override.yml
+
+# ==========================================
+# IDE and operating system
+# ==========================================
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# ==========================================
+# Temporary archives
+# ==========================================
+*.zip
+*.tar
+*.tar.gz
+*.7z

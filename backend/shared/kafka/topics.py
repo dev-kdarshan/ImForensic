@@ -1,0 +1,5 @@
+ANALYSIS_JOBS = "analysis-jobs"
+ENGINE_TASKS = "engine-tasks"
+ENGINE_RESULTS = "engine-results"
+ANALYSIS_STATUS = "analysis-status"
+ANALYSIS_ERRORS = "analysis-errors"
