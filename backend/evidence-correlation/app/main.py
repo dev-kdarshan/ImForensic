@@ -36,7 +36,10 @@ def correlate(request: CorrelationRequest) -> dict[str, Any]:
     seen: set[str] = set()
     for payload in request.results:
         try:
-            result = normalize_engine_result(payload)
+            if isinstance(payload.get("findings"), list) and "raw_result" in payload:
+                result = EngineResult.model_validate(payload)
+            else:
+                result = normalize_engine_result(payload)
         except (ValueError, TypeError) as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from None
         if result.analysis_id != request.analysis_id:

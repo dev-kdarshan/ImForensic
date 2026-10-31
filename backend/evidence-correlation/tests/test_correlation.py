@@ -34,3 +34,19 @@ def test_correlation_rejects_cross_analysis_results_and_duplicate_engines():
     duplicate = client.post("/correlate", json={"analysis_id": "analysis-1", "results": [result("pixel-forensics", {}), result("pixel-forensics", {})]})
     assert mismatch.status_code == 422
     assert duplicate.status_code == 422
+
+
+def test_correlation_preserves_canonical_engine_result_envelope():
+    canonical = {
+        "schema_version": "1.0.0", "analysis_id": "analysis-1",
+        "engine": "pixel-forensics", "engine_version": "0.1.0", "status": "completed",
+        "findings": [{"finding_id": "stable-123", "finding_type": "noise",
+                      "source_engine": "pixel-forensics", "source_path": "findings.noise",
+                      "value": {"mean": 2}, "evidence": []}],
+        "raw_result": {"engine": "pixel-forensics", "findings": {"noise": {"mean": 2}}},
+        "warnings": [], "limitations": []
+    }
+    response = client.post("/correlate", json={"analysis_id": "analysis-1",
+        "expected_engines": ["pixel-forensics"], "results": [canonical]})
+    assert response.status_code == 200
+    assert response.json()["engine_results"][0]["findings"][0]["finding_id"] == "stable-123"
