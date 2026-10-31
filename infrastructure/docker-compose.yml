@@ -34,6 +34,18 @@ services:
       retries: 5
     restart: unless-stopped
 
+  model-fingerprint:
+    build:
+      context: ../backend/services/model-fingerprint
+    ports:
+      - "8002:8002"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8002/ready')"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
   kafka:
     image: apache/kafka:3.9.1
     hostname: kafka
@@ -58,7 +70,7 @@ services:
     environment:
       POSTGRES_DB: imforensic
       POSTGRES_USER: imforensic
-      POSTGRES_PASSWORD: \${POSTGRES_PASSWORD:-change-me}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
     ports:
       - "5432:5432"
     volumes:
