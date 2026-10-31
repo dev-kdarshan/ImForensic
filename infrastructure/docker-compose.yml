@@ -1,3 +1,9 @@
+x-engine-worker-env: &engine_worker_env
+  KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+  GATEWAY_INTERNAL_URL: http://api-gateway:8000
+  IMFORENSIC_INTERNAL_TOKEN: ${IMFORENSIC_INTERNAL_TOKEN:-local-dev-only-change-me}
+  ENGINE_HTTP_TIMEOUT_SECONDS: 120
+
 services:
   api-gateway:
     build:
@@ -180,4 +186,15 @@ services:
 volumes:
   postgres_data:
   imforensic_data:
-  dda_torch_cache:
+  dda_torch_cache:  engine-worker-metadata:
+    build: {context: .., dockerfile: backend/orchestrator/Dockerfile}
+    command: ["python","-m","app.engine_worker"]
+    environment:
+      <<: *engine_worker_env
+      ENGINE_NAME: metadata-provenance
+    depends_on:
+      kafka: {condition: service_healthy}
+      api-gateway: {condition: service_healthy}
+      metadata-provenance: {condition: service_healthy}
+    restart: unless-stopped
+
