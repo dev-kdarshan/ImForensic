@@ -4,6 +4,8 @@ services:
       context: ../backend/api-gateway
     environment:
       METADATA_SERVICE_URL: http://metadata-provenance:8001
+      MODEL_FINGERPRINT_SERVICE_URL: http://model-fingerprint:8002
+      ENGINE_TIMEOUT_SECONDS: 30
       IMFORENSIC_DB_PATH: /app/data/imforensic.sqlite3
       IMFORENSIC_UPLOAD_DIR: /app/data/uploads
       MAX_UPLOAD_MB: 20
@@ -14,6 +16,8 @@ services:
       - imforensic_data:/app/data
     depends_on:
       metadata-provenance:
+        condition: service_healthy
+      model-fingerprint:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]

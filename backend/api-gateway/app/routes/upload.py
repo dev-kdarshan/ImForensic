@@ -17,7 +17,8 @@ router = APIRouter()
 MAX_FILE_SIZE = int(os.getenv("MAX_UPLOAD_MB", "20")) * 1024 * 1024
 ALLOWED_TYPES = {"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp"}
 METADATA_SERVICE_URL = os.getenv("METADATA_SERVICE_URL", "http://127.0.0.1:8001").rstrip("/")
-METADATA_TIMEOUT = float(os.getenv("METADATA_TIMEOUT_SECONDS", "30"))
+MODEL_FINGERPRINT_SERVICE_URL = os.getenv("MODEL_FINGERPRINT_SERVICE_URL", "http://127.0.0.1:8002").rstrip("/")
+ENGINE_TIMEOUT = float(os.getenv("ENGINE_TIMEOUT_SECONDS", "30"))
 
 
 def _validate_image(content: bytes, extension: str) -> None:
@@ -37,6 +38,39 @@ def _validate_image(content: bytes, extension: str) -> None:
             image.verify()
     except (UnidentifiedImageError, OSError, Image.DecompressionBombError, Image.DecompressionBombWarning):
         raise HTTPException(status_code=422, detail="Uploaded file is not a valid safe image.") from None
+
+
+async def _call_engine(service_url: str, filename: str, content: bytes, content_type: str, analysis_id: str) -> dict:
+    async with httpx.AsyncClient(timeout=ENGINE_TIMEOUT) as client:
+        response = await client.post(
+            f"{service_url}/analyze",
+            data={"analysis_id": analysis_id},
+            files={"file": (filename, content, content_type)},
+        )
+        response.raise_for_status()
+        payload = response.json()
+        if not isinstance(payload, dict):
+            raise ValueError("Engine response must be a JSON object.")
+        return payload
+
+
+async def _run_engine(engine: str, service_url: str, filename: str, content: bytes,
+                      content_type: str, analysis_id: str, expected_sha256: str,
+                      hash_path: tuple[str, ...]) -> tuple[dict, dict | None]:
+    try:
+        payload = await _call_engine(service_url, filename, content, content_type, analysis_id)
+        actual = payload
+        for key in hash_path:
+            actual = actual.get(key, {}) if isinstance(actual, dict) else {}
+        if not isinstance(actual, dict) or actual.get("sha256") != expected_sha256:
+            raise ValueError("Engine SHA-256 did not match the Gateway SHA-256.")
+        return {"status": "completed", "engine": engine}, payload
+    except (httpx.HTTPError, ValueError, RuntimeError) as exc:
+        return {
+            "status": "failed",
+            "engine": engine,
+            "error": f"{type(exc).__name__}: engine did not return a verified result",
+        }, None
 
 
 @router.post("/analyses", status_code=201)
@@ -60,23 +94,21 @@ async def create_analysis(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail="Could not store the uploaded image.") from None
 
     created_at = datetime.now(timezone.utc).isoformat()
-    result = None
-    error = None
-    status = "failed"
-    try:
-        async with httpx.AsyncClient(timeout=METADATA_TIMEOUT) as client:
-            response = await client.post(
-                f"{METADATA_SERVICE_URL}/analyze",
-                files={"file": (filename, content, file.content_type)},
-            )
-            response.raise_for_status()
-            result = response.json()
-            if result.get("file", {}).get("sha256") != sha256:
-                raise RuntimeError("Metadata service hash did not match the gateway hash.")
-            status = "completed"
-    except (httpx.HTTPError, ValueError, RuntimeError) as exc:
-        error = f"Metadata analysis unavailable: {type(exc).__name__}"
-        status = "partial"
+    metadata_state, metadata_payload = await _run_engine(
+        "metadata-provenance", METADATA_SERVICE_URL, filename, content,
+        file.content_type, analysis_id, sha256, ("file",)
+    )
+    fingerprint_state, fingerprint_payload = await _run_engine(
+        "model-fingerprint", MODEL_FINGERPRINT_SERVICE_URL, filename, content,
+        file.content_type, analysis_id, sha256, ("image",)
+    )
+    engine_results = {
+        "metadata-provenance": {**metadata_state, "result": metadata_payload},
+        "model-fingerprint": {**fingerprint_state, "result": fingerprint_payload},
+    }
+    status = "completed" if all(item["status"] == "completed" for item in engine_results.values()) else "partial"
+    failed = [name for name, item in engine_results.items() if item["status"] != "completed"]
+    error = "One or more analysis engines did not return a verified result: " + ", ".join(failed) if failed else None
 
     record = {
         "analysis_id": analysis_id,
@@ -87,7 +119,8 @@ async def create_analysis(file: UploadFile = File(...)):
         "size_bytes": len(content),
         "sha256": sha256,
         "storage_ref": Path(stored_path).name,
-        "result": result,
+        "result": metadata_payload,
+        "engine_results": engine_results,
         "error": error,
     }
     save_analysis(record)

@@ -23,13 +23,15 @@ export default function App() {
     finally { setBusy(false); }
   }
 
+  const engineResults = analysis?.engine_results || {};
+
   return (
     <main className="shell">
       <header className="topbar">
         <div><p className="eyebrow">IMAGE FORENSICS WORKSPACE</p><h1>ImForensic</h1></div>
         <span className={'health ' + health}>API {health}</span>
       </header>
-      <p className="intro">Examine image metadata and provenance indicators. Findings are evidence to investigate—not proof of authenticity, manipulation, or AI generation.</p>
+      <p className="intro">Examine image metadata and descriptive image features. Findings are evidence to investigate—not proof of authenticity, manipulation, or AI generation.</p>
       <section className="panel">
         <h2>Start an analysis</h2>
         <p className="muted">JPEG, PNG or WebP · Maximum 20 MB</p>
@@ -49,7 +51,12 @@ export default function App() {
           <div><dt>File</dt><dd>{analysis.filename}</dd></div>
           <div><dt>Size</dt><dd>{sizeLabel(analysis.size_bytes)}</dd></div>
           <div><dt>SHA-256</dt><dd className="hash">{analysis.sha256}</dd></div>
-          <div><dt>Metadata engine</dt><dd>{analysis.result ? 'Completed' : 'Unavailable'}</dd></div>
+        </dl>
+        <h3>Engine results</h3>
+        <dl>
+          <div><dt>Metadata &amp; Provenance</dt><dd>{engineResults['metadata-provenance']?.status || 'Not reported'}</dd></div>
+          <div><dt>Model Fingerprinting</dt><dd>{engineResults['model-fingerprint']?.status || 'Not reported'}</dd></div>
+          <div><dt>Fingerprint outcome</dt><dd>{engineResults['model-fingerprint']?.result?.findings?.outcome || 'Unavailable'}</dd></div>
         </dl>
         {analysis.error && <p className="error">{analysis.error}</p>}
         {analysis.result && <>
@@ -64,6 +71,10 @@ export default function App() {
           </dl>
           <h3>Interpretation limits</h3>
           <ul>{analysis.result.observations.map((item) => <li key={item}>{item}</li>)}</ul>
+        </>}
+        {engineResults['model-fingerprint']?.result?.warnings?.length > 0 && <>
+          <h3>Model Fingerprinting limitations</h3>
+          <ul>{engineResults['model-fingerprint'].result.warnings.map((item) => <li key={item}>{item}</li>)}</ul>
         </>}
       </section>}
       <p className="footer">Configure retention, access control and encryption before production deployment.</p>
