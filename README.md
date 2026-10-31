@@ -9,11 +9,12 @@ ImForensic is a modular image-forensics project for examining metadata, provenan
 - Metadata & Provenance service extracts image dimensions, format, mode, EXIF, selected embedded metadata, software/XMP signals, and interpretation limitations.
 - Model Fingerprinting service extracts deterministic descriptive features: channel statistics/histograms/entropy, grayscale entropy/histogram, a simple edge-response statistic, and coarse spatial luminance measurements.
 - The Gateway sends the same uploaded bytes to both engines over internal HTTP, verifies each returned SHA-256, and persists independent per-engine results. One engine failure does not discard the other engine's result.
-- Docker Compose includes the Gateway, Metadata & Provenance, Model Fingerprinting, Kafka, PostgreSQL, and Redis services.
+- Pixel Forensics is available as an independent service on port 8003. It reports JPEG quantization-table information, bounded high-pass residual measurements, and edge-response statistics. It is deliberately not connected to the Gateway upload route yet.
+- Docker Compose includes the Gateway, Metadata & Provenance, Model Fingerprinting, Pixel Forensics, Kafka, PostgreSQL, and Redis services.
 
-**Scientific limitation:** Model Fingerprinting is not a trained generator classifier. It returns an inconclusive attribution outcome and does not provide model identification, candidate rankings, or calibrated probabilities. No labelled reference dataset or model weights are included. See the Model Fingerprinting documentation in docs/model-fingerprinting.md.
+**Scientific limitations:** Model Fingerprinting is not a trained generator classifier. It returns an inconclusive attribution outcome and does not provide model identification, candidate rankings, or calibrated probabilities. Pixel Forensics is a descriptive signal-processing baseline; it does not classify manipulation or produce tamper masks. No labelled benchmark dataset or validated detector is included. See [docs/pixel-forensics.md](docs/pixel-forensics.md) and the Model Fingerprinting documentation in docs/model-fingerprinting.md.
 
-Kafka asynchronous orchestration, the remaining four forensic engines, evidence correlation, SSE progress, C2PA signature verification, and AI-generation classification are not yet implemented. PostgreSQL and Redis are infrastructure services; the current Gateway persistence is SQLite.
+Kafka asynchronous orchestration, the remaining three forensic engines, evidence correlation, SSE progress, C2PA signature verification, and AI-generation classification are not yet implemented. PostgreSQL and Redis are infrastructure services; the current Gateway persistence is SQLite.
 
 ## Run with Docker
 
@@ -24,6 +25,7 @@ From the repository root:
 - API Gateway: http://localhost:8000 (API docs at /docs)
 - Metadata engine: http://localhost:8001/docs
 - Model Fingerprinting engine: http://localhost:8002/docs
+- Pixel Forensics engine: http://localhost:8003/docs
 
 Run the frontend separately:
 
@@ -32,6 +34,10 @@ Run the frontend separately:
     npm run dev
 
 Set VITE_API_BASE_URL=http://localhost:8000 in frontend/.env if required.
+
+To run only Pixel Forensics:
+
+    docker compose -f infrastructure/docker-compose.yml up --build pixel-forensics
 
 ## Run backend services locally
 
@@ -54,7 +60,17 @@ For the Model Fingerprinting service:
     python -m pip install -r requirements.txt
     pytest -q
 
-For the Gateway, run its pytest suite from backend/api-gateway after installing requirements.txt. Tests have been authored but were not executed through the GitHub editing session; run both suites and a Docker Compose smoke test before merging.
+For Pixel Forensics:
+
+    cd backend/services/pixel-forensics
+    python -m pip install -r requirements.txt
+    pytest -q
+
+For the Gateway, run its pytest suite from backend/api-gateway after installing requirements.txt. Tests have been authored but were not executed through the GitHub editing session; run the suites and a Docker Compose smoke test before merging.
+
+## Pixel Forensics scope
+
+See [docs/pixel-forensics.md](docs/pixel-forensics.md) for method rationale, API, coordinate conventions, limitations, dataset/benchmark plan, and reproduction commands. Current measurements are descriptive, not calibrated scores or probabilities. Double-JPEG estimation, resampling periodicity, copy-move detection, inpainting/compositing classification, and learned detection remain deferred pending defensible methods and a documented evaluation dataset.
 
 ## Production considerations
 
