@@ -62,6 +62,28 @@ services:
       retries: 5
     restart: unless-stopped
 
+  ai-content-detection:
+    build:
+      context: ../backend/services/ai-content-detection
+      args:
+        ENABLE_DDA: ${ENABLE_DDA:-false}
+        TORCH_INDEX_URL: ${TORCH_INDEX_URL:-https://download.pytorch.org/whl/cpu}
+    environment:
+      DDA_CHECKPOINT_PATH: /models/DDA_ckpt.pth
+      DDA_CHECKPOINT_SHA256: ${DDA_CHECKPOINT_SHA256:-b27a31d39374803ddeff02bfabb2be76e190b04300490cddfafb24f683f37e3e}
+      DDA_DEVICE: ${DDA_DEVICE:-auto}
+    volumes:
+      - ${DDA_MODEL_DIR:-../models}:/models:ro
+      - dda_torch_cache:/root/.cache/torch
+    ports:
+      - "8004:8004"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8004/health')"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
   kafka:
     image: apache/kafka:3.9.1
     hostname: kafka
@@ -100,3 +122,4 @@ services:
 volumes:
   postgres_data:
   imforensic_data:
+  dda_torch_cache:
