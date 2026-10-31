@@ -1,7 +1,41 @@
-# Local infrastructure starter. Add service images and health checks as implementation progresses.
 services:
+  api-gateway:
+    build:
+      context: ../backend/api-gateway
+    environment:
+      METADATA_SERVICE_URL: http://metadata-provenance:8001
+      IMFORENSIC_DB_PATH: /app/data/imforensic.sqlite3
+      IMFORENSIC_UPLOAD_DIR: /app/data/uploads
+      MAX_UPLOAD_MB: 20
+      CORS_ORIGINS: http://localhost:5173
+    ports:
+      - "8000:8000"
+    volumes:
+      - imforensic_data:/app/data
+    depends_on:
+      metadata-provenance:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  metadata-provenance:
+    build:
+      context: ../backend/services/metadata-provenance
+    ports:
+      - "8001:8001"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
   kafka:
-    image: apache/kafka:latest
+    image: apache/kafka:3.9.1
     hostname: kafka
     ports:
       - "9092:9092"
@@ -24,7 +58,7 @@ services:
     environment:
       POSTGRES_DB: imforensic
       POSTGRES_USER: imforensic
-      POSTGRES_PASSWORD: change-me
+      POSTGRES_PASSWORD: \${POSTGRES_PASSWORD:-change-me}
     ports:
       - "5432:5432"
     volumes:
@@ -37,3 +71,4 @@ services:
 
 volumes:
   postgres_data:
+  imforensic_data:

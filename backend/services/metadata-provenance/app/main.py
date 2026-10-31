@@ -1,35 +1,30 @@
-
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel, Field
+from fastapi import FastAPI, File, HTTPException, UploadFile
+from PIL import UnidentifiedImageError
 
 from app.analyzer import analyze_image
 
 app = FastAPI(
-    title="ImForensic Metadata & Provenance Service",
-    version="0.1.0",
+    title="ImForensic Metadata & Provenance Engine",
+    version="1.0.0",
+    description="Extracts image metadata and provenance indicators without trusting client paths.",
 )
-
-
-class AnalyzeRequest(BaseModel):
-    image_path: str = Field(min_length=1)
 
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "service": "metadata-provenance"}
+    return {"status": "ok", "service": "metadata-provenance", "version": "1.0.0"}
 
 
 @app.post("/analyze")
-def analyze(request: AnalyzeRequest):
+async def analyze(file: UploadFile = File(...)):
+    content = await file.read(20 * 1024 * 1024 + 1)
+    if len(content) > 20 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="Image exceeds 20 MB.")
     try:
-        return analyze_image(request.image_path)
-    except FileNotFoundError:
-        raise HTTPException(
-            status_code=404,
-            detail="Image file not found.",
-        ) from None
-    except (OSError, ValueError) as exc:
-        raise HTTPException(
-            status_code=422,
-            detail=f"Could not analyze image: {type(exc).__name__}",
-        ) from None
+        return analyze_image(content, file.filename)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from None
+    except (OSError, UnidentifiedImageError):
+        raise HTTPException(status_code=422, detail="Image could not be analyzed.") from None
+    finally:
+        await file.close()
