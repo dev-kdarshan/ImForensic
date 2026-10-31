@@ -18,7 +18,7 @@ Each engine remains responsible for its own observations. Correlation preserves 
 
 ## Distributed processing
 
-The Orchestrator HTTP API publishes analysis-jobs; the Kafka worker fans each valid request into one engine-tasks message per requested engine. Messages use analysis_id and deterministic task_id keys and contain an opaque image reference, digest, schema version and idempotency key. The worker uses manual offset commits, bounded producer retries, and an invalid-job dead-letter topic. Delivery is **at least once**, not exactly once. A consumer must persist/deduplicate task_id before side effects. Engine-task consumers and engine-result ingestion are not implemented in this increment.
+The Orchestrator HTTP API publishes analysis-jobs; the Kafka worker fans each valid request into one engine-tasks message per requested engine. Messages use analysis_id and deterministic task_id keys and contain an opaque image reference, digest, schema version and idempotency key. The worker uses manual offset commits, bounded producer retries, delivery callbacks, and an invalid-job dead-letter topic. Delivery is **at least once**, not exactly once. A consumer must persist/deduplicate task_id before side effects. Engine-task consumers and engine-result ingestion are not implemented in this increment.
 
 ## Storage and privacy
 
@@ -30,17 +30,19 @@ The Gateway existing storage abstraction uses UUID-derived filenames under its c
 - Gateway: existing synchronous Metadata/Model Fingerprint calls remain unchanged; asynchronous submission is exposed by Orchestrator separately.
 - Orchestrator: new /jobs API and Kafka fan-out worker.
 - Evidence Correlation: new /correlate API.
-- Infrastructure: Docker Compose fixes the committed merge-conflict markers, adds Orchestrator/Correlation services, and separates internal Kafka kafka:9092 from host access localhost:9094.
+- Infrastructure: Docker Compose fixes the committed merge-conflict markers, adds AI Content Detection, Orchestrator/Correlation services, and separates internal Kafka kafka:9092 from host access localhost:9092.
 
 Before migrating engine HTTP responses to the canonical envelope, update Gateway response parsing, frontend rendering, persisted records, and each engine API tests together. This change deliberately avoids a breaking all-engine migration.
 
 ## Validation and status
 
-The schema, normalizer, correlation logic, and request validation have unit tests. Docker/Kafka end-to-end execution and the six-engine compatibility matrix remain unverified until run in the target environment. No benchmark or forensic accuracy claim is made by this contract layer.
+Unit tests are authored for schema validation, stable finding IDs, worker task IDs, missing-engine reporting, explicit conflict detection, cross-analysis rejection, and duplicate-engine rejection. They have not been executed in this environment. Docker/Kafka end-to-end execution and the six-engine compatibility matrix remain unverified. No benchmark or forensic accuracy claim is made by this contract layer.
 
 ## Local commands
 
-    python -m pip install -r backend/orchestrator/requirements.txt -r backend/evidence-correlation/requirements.txt
-    PYTHONPATH=backend pytest -q backend/shared/tests backend/orchestrator/tests backend/evidence-correlation/tests
+    python -m pip install -r backend/orchestrator/requirements.txt -r backend/evidence-correlation/requirements.txt pytest httpx
+    PYTHONPATH=backend pytest -q backend/shared/tests
+    PYTHONPATH=backend:backend/orchestrator pytest -q backend/orchestrator/tests
+    PYTHONPATH=backend:backend/evidence-correlation pytest -q backend/evidence-correlation/tests
     docker compose -f infrastructure/docker-compose.yml config
     docker compose -f infrastructure/docker-compose.yml up --build

@@ -12,6 +12,17 @@ from shared.kafka.topics import ANALYSIS_JOBS, ANALYSIS_JOBS_DLQ, ENGINE_TASKS
 def _task_id(analysis_id: str, engine: str) -> str:
     return hashlib.sha256(f"{analysis_id}:{engine}".encode()).hexdigest()
 
+def _publish_task(producer: Producer, task: dict) -> None:
+    delivery_errors: list[str] = []
+    def delivered(error, message) -> None:
+        if error is not None:
+            delivery_errors.append(str(error))
+    producer.produce(ENGINE_TASKS, key=task["task_id"], value=json.dumps(task).encode(), on_delivery=delivered)
+    if producer.flush(10):
+        raise TimeoutError("Kafka engine-task delivery timeout")
+    if delivery_errors:
+        raise KafkaException(delivery_errors[0])
+
 def run() -> None:
     bootstrap = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "kafka:9092")
     consumer = Consumer({"bootstrap.servers": bootstrap, "group.id": "imforensic-orchestrator-v1",
@@ -35,20 +46,18 @@ def run() -> None:
                 last_error = None
                 for attempt in range(3):
                     try:
-                        producer.produce(ENGINE_TASKS, key=task["task_id"], value=json.dumps(task).encode())
-                        if producer.flush(10) == 0:
-                            last_error = None
-                            break
-                        raise TimeoutError("Kafka engine-task delivery timeout")
+                        _publish_task(producer, task)
+                        last_error = None
+                        break
                     except (KafkaException, BufferError, TimeoutError) as exc:
                         last_error = exc
                         time.sleep(0.25 * (2 ** attempt))
                 if last_error:
                     raise last_error
             consumer.commit(message=message, asynchronous=False)
-        except (ValidationError, ValueError, TypeError) as exc:
+        except (ValidationError, ValueError, TypeError):
             producer.produce(ANALYSIS_JOBS_DLQ, key=message.key(),
-                             value=json.dumps({"reason": type(exc).__name__,
+                             value=json.dumps({"reason": "INVALID_ANALYSIS_JOB",
                                                "payload_sha256": hashlib.sha256(message.value()).hexdigest()}).encode())
             producer.flush(10)
             consumer.commit(message=message, asynchronous=False)
