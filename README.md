@@ -8,6 +8,7 @@ ImForensic is a modular image-forensics project for examining metadata, provenan
 - **Model Fingerprinting:** extracts deterministic descriptive image features; does not attribute a generator/model.
 - **Pixel Forensics (baseline):** inspects JPEG quantization tables and reports bounded high-pass residual and edge-response statistics. It deliberately returns inconclusive rather than declaring tampering.
 - **AI Content Detection (service boundary):** validates image input and exposes the shared engine-result shape. No AI detector is configured yet, so results are partial/inconclusive until a model is selected, secured and benchmarked.
+- **Visual Consistency (descriptive baseline):** reports regional luminance, colour and edge-response measurements with cautious within-image outlier flags. It does not infer lighting physics, shadows, perspective, objects, or manipulation.
 
 See [docs/ai-content-detection.md](docs/ai-content-detection.md) for the repository audit, task definition, model comparison, data/licensing review, evaluation plan, and implementation gates.
 
@@ -22,6 +23,7 @@ From the repository root:
 - Model Fingerprinting engine: http://localhost:8002/docs
 - Pixel Forensics engine: http://localhost:8003/docs
 - AI Content Detection engine: http://localhost:8004/docs
+- Visual Consistency engine: http://localhost:8006/docs
 
 The AI Content Detection service is not yet connected to the Gateway upload workflow. DDA inference is experimental and remains unready until a locally mounted checkpoint with the pinned SHA-256 is configured. See [DDA inference and benchmark guide](backend/services/ai-content-detection/docs/dda-and-benchmark.md).
 
@@ -36,6 +38,14 @@ Run the frontend separately:
     cd backend/services/ai-content-detection
     python -m pip install -r requirements.txt
     pytest -q
+
+## Run Visual Consistency tests
+
+    cd backend/services/visual-consistency
+    python -m pip install -r requirements.txt
+    pytest -q
+
+See [docs/visual-consistency.md](docs/visual-consistency.md) for the task scope, measurement semantics, dataset protocol, and limitations.
 
 ## Evaluate a detector
 
