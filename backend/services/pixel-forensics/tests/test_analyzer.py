@@ -74,6 +74,7 @@ def test_api_health_readiness_and_analysis():
     )
     assert response.status_code == 200
     assert response.json()["findings"]["outcome"] == "inconclusive"
+    assert response.json()["analysis_id"]
 
 
 def test_api_rejects_invalid_analysis_uuid():

@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import logging
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
 
@@ -46,6 +46,8 @@ async def analyze(file: UploadFile = File(...), analysis_id: str | None = None):
                 result["analysis_id"] = str(UUID(analysis_id))
             except ValueError:
                 raise HTTPException(status_code=422, detail="analysis_id must be a UUID.") from None
+        else:
+            result["analysis_id"] = str(uuid4())
         return result
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from None
