@@ -29,8 +29,7 @@ services:
   metadata-provenance:
     build:
       context: ../backend/services/metadata-provenance
-    ports:
-      - "8001:8001"
+    ports: ["8001:8001"]
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"]
       interval: 10s
@@ -41,8 +40,7 @@ services:
   model-fingerprint:
     build:
       context: ../backend/services/model-fingerprint
-    ports:
-      - "8002:8002"
+    ports: ["8002:8002"]
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8002/ready')"]
       interval: 10s
@@ -53,8 +51,7 @@ services:
   pixel-forensics:
     build:
       context: ../backend/services/pixel-forensics
-    ports:
-      - "8003:8003"
+    ports: ["8003:8003"]
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8003/ready')"]
       interval: 10s
@@ -62,49 +59,109 @@ services:
       retries: 5
     restart: unless-stopped
 
-<<<<<<< HEAD
+  ai-content-detection:
+    build:
+      context: ../backend/services/ai-content-detection
+    ports: ["8004:8004"]
+    environment:
+      DDA_CHECKPOINT_PATH: /models/DDA_ckpt.pth
+    volumes:
+      - dda_torch_cache:/root/.cache/torch
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8004/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
   watermark-detection:
     build:
       context: ../backend/services/watermark-detection
-    ports:
-      - "8005:8005"
+    ports: ["8005:8005"]
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8005/health')"]
       interval: 15s
       timeout: 5s
       retries: 3
-=======
+    restart: unless-stopped
+
   visual-consistency:
     build:
       context: ../backend/services/visual-consistency
-    ports:
-      - "8006:8006"
+    ports: ["8006:8006"]
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8006/ready')"]
       interval: 10s
       timeout: 3s
       retries: 5
->>>>>>> 89b5da0cd04dd3cad82de139a5bc4afb98e98473
+    restart: unless-stopped
+
+  orchestrator-api:
+    build:
+      context: ..
+      dockerfile: backend/orchestrator/Dockerfile
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+    ports: ["8007:8007"]
+    depends_on:
+      kafka:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8007/health')"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  orchestrator-worker:
+    build:
+      context: ..
+      dockerfile: backend/orchestrator/Dockerfile
+    command: ["python", "-m", "app.worker"]
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+    depends_on:
+      kafka:
+        condition: service_healthy
+    restart: unless-stopped
+
+  evidence-correlation:
+    build:
+      context: ..
+      dockerfile: backend/evidence-correlation/Dockerfile
+    ports: ["8008:8008"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8008/health')"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
     restart: unless-stopped
 
   kafka:
     image: apache/kafka:3.9.1
     hostname: kafka
     ports:
-      - "9092:9092"
+      - "9092:9094"
     environment:
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: broker,controller
-      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_LISTENERS: INTERNAL://:9092,EXTERNAL://:9094,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:9092,EXTERNAL://localhost:9092
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
       KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
       CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
 
   postgres:
     image: postgres:16
@@ -112,15 +169,13 @@ services:
       POSTGRES_DB: imforensic
       POSTGRES_USER: imforensic
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
-    ports:
-      - "5432:5432"
+    ports: ["5432:5432"]
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
   redis:
     image: redis:7-alpine
-    ports:
-      - "6379:6379"
+    ports: ["6379:6379"]
 
 volumes:
   postgres_data:

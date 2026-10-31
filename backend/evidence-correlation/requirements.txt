@@ -1,2 +1,3 @@
-pydantic
-confluent-kafka
+fastapi>=0.110,<1
+uvicorn[standard]>=0.27,<1
+pydantic>=2.6,<3

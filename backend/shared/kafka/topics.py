@@ -1,5 +1,8 @@
+"""Stable Kafka topic names shared by the platform."""
 ANALYSIS_JOBS = "analysis-jobs"
 ENGINE_TASKS = "engine-tasks"
 ENGINE_RESULTS = "engine-results"
 ANALYSIS_STATUS = "analysis-status"
 ANALYSIS_ERRORS = "analysis-errors"
+ANALYSIS_JOBS_DLQ = "analysis-jobs-dlq"
+ENGINE_TASKS_DLQ = "engine-tasks-dlq"
