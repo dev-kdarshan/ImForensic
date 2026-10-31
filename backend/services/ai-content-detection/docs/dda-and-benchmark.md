@@ -33,7 +33,7 @@ The inspected official inference script uses RGB conversion, `CenterCrop(336)`, 
 
 This adapter applies EXIF orientation before RGB conversion as a deliberate input-normalization policy; it is recorded in result metadata. The official DDA repository notes that JPEG decoder versions affect reproduced results and recommends Pillow 12.3.0 with libjpeg-turbo 3.1.4.1 for its reported benchmark reproduction. Pillow is pinned here; the container's libjpeg-turbo version must still be checked and matched before comparing benchmark figures. No resize is applied: images smaller than the crop size may be padded by torchvision CenterCrop semantics.
 
-The score is `sigmoid(raw_logit)`, oriented higher = more AI-generated/synthetic-like under the DDA label convention. It is a bounded model score, **not a calibrated probability**, not confidence of authenticity, and not evidence of provenance. The API currently emits an unthresholded score only. It does not declare an AI/real decision. A decision threshold must be selected on a separate validation/calibration split and then frozen before test evaluation.
+The score is `sigmoid(raw_logit)`, oriented higher = more AI-generated/synthetic-like under the DDA training labels (real=0, fake=1). It is a bounded model score, **not a calibrated probability**, not confidence of authenticity, and not evidence of provenance. The API currently emits an unthresholded score only. It does not declare an AI/real decision. A decision threshold must be selected on a separate validation/calibration split and then frozen before test evaluation.
 
 ## Install and run
 
@@ -48,10 +48,12 @@ export DDA_CHECKPOINT_PATH=/models/DDA_ckpt.pth
 export DDA_CHECKPOINT_SHA256=b27a31d39374803ddeff02bfabb2be76e190b04300490cddfafb24f683f37e3e
 export DDA_DEVICE=auto  # auto | cpu | cuda
 python scripts/check_runtime.py
+python scripts/benchmark_inference.py /datasets/sample.jpg --device cpu --runs 10
+# Repeat with --device cuda on a CUDA-enabled host.
 uvicorn app.main:app --host 0.0.0.0 --port 8004
 ```
 
-For CUDA, replace the CPU wheel index with the PyTorch-provided CUDA 12.4 wheel index (or the index matching the target build) and rebuild the service image with `TORCH_INDEX_URL`. First model initialization requires access to the pinned DINOv2 source and pretrained backbone weights, unless already cached. The checkpoint is about 1.26 GB; reserve disk, RAM and VRAM headroom. GPU availability does not guarantee sufficient VRAM. CPU inference may be very slow; measure on the actual deployment hardware. No CPU/GPU performance claim is made by this change.
+For Docker Compose, set `ENABLE_DDA=true`; set `TORCH_INDEX_URL` to the CPU wheel index (default) or the PyTorch-provided CUDA 12.4 wheel index for the target GPU build. Set `DDA_MODEL_DIR` to the directory containing the downloaded checkpoint. For a manual install, replace the CPU wheel index in the command above with the PyTorch-provided CUDA index matching the target build. First model initialization requires access to the pinned DINOv2 source and pretrained backbone weights, unless already cached. The checkpoint is about 1.26 GB; reserve disk, RAM and VRAM headroom. GPU availability does not guarantee sufficient VRAM. CPU inference may be very slow; measure on the actual deployment hardware. No CPU/GPU performance claim is made by this change.
 
 ## Independent benchmark
 
@@ -76,7 +78,7 @@ This PR adds the inference adapter and benchmark runner but does not download th
 1. install pinned dependencies in CPU and target GPU environments;
 2. verify the checkpoint digest from the actual downloaded file;
 3. load the model and compare preprocessing/logit outputs against the official inference script on fixed fixtures;
-4. run representative CPU and GPU memory/latency tests;
+4. run `scripts/benchmark_inference.py` on CPU and the target GPU, recording cold start, warm latency, throughput and peak VRAM;
 5. run source-disjoint and generator-disjoint benchmarks;
 6. decide whether a calibration step is warranted using held-out validation data;
 7. define false-positive acceptance criteria before production.

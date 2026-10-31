@@ -6,6 +6,7 @@ import argparse
 import json
 import os
 import statistics
+import sys
 import time
 from pathlib import Path
 
@@ -21,6 +22,7 @@ def main():
         parser.error("--warmup must be >= 0 and --runs must be >= 1")
     os.environ["DDA_DEVICE"] = args.device
 
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
     import torch
     from app.dda_model import predict
 
