@@ -25,13 +25,14 @@ def persist(message):
         db.execute("INSERT OR IGNORE INTO engine_results VALUES (?,?,?,?,?)",
           (result.analysis_id,result.engine,message["task_id"],json.dumps(expected),result.model_dump_json()))
         rows=db.execute("SELECT engine,result_json FROM engine_results WHERE analysis_id=?",(result.analysis_id,)).fetchall()
-        results=[json.loads(row[1]) for row in rows]; received={row[0] for row in rows}
+        stored={row[0]:json.loads(row[1]) for row in rows}
+        received=set(stored)
         done=db.execute("SELECT 1 FROM completed_analyses WHERE analysis_id=?",(result.analysis_id,)).fetchone()
-        return expected,results,bool(done) or set(expected).issubset(received)
-def deliver(message):
+        return expected,list(stored.values()),bool(done) or set(expected).issubset(received),stored[result.engine]
+def deliver(message,stored_result):
     with httpx.Client(timeout=TIMEOUT) as client:
         client.post(f"{GATEWAY_URL}/internal/results",headers={"X-ImForensic-Internal-Token":TOKEN},
-          json={"analysis_id":message["analysis_id"],"engine":message["engine"],"result":message["result"]}).raise_for_status()
+          json={"analysis_id":message["analysis_id"],"engine":message["engine"],"result":stored_result}).raise_for_status()
 def correlate(analysis_id,expected,results):
     with httpx.Client(timeout=TIMEOUT) as client:
         response=client.post(f"{CORRELATION_URL}/correlate",
@@ -51,8 +52,8 @@ def run():
         if message is None: continue
         if message.error(): continue
         try:
-            payload=json.loads(message.value()); expected,results,complete=persist(payload)
-            deliver(payload)
+            payload=json.loads(message.value()); expected,results,complete,stored=persist(payload)
+            deliver(payload,stored)
             if complete: correlate(payload["analysis_id"],expected,results)
             consumer.commit(message=message,asynchronous=False)
         except (ValueError,KeyError,TypeError): time.sleep(1)
