@@ -22,6 +22,7 @@ def test_analysis_endpoint_persists_partial_when_metadata_service_is_down(monkey
     monkeypatch.setattr(upload, "METADATA_SERVICE_URL", "http://127.0.0.1:1")
     monkeypatch.setattr(repository, "DB_PATH", tmp_path / "test.sqlite3")
     monkeypatch.setattr(storage, "STORAGE_DIR", tmp_path / "uploads")
+    storage.STORAGE_DIR.mkdir(parents=True, exist_ok=True)
     response = TestClient(app).post(
         "/api/v1/analyses", files={"file": ("evidence.png", png_bytes(), "image/png")}
     )
