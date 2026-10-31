@@ -149,13 +149,21 @@ Before enabling inference:
 
 Kafka is intentionally not implemented in this engine stage. The eventual message should carry analysis/job identifiers and controlled storage references, never raw image bytes.
 
-## 8. Current limitations and next milestones
+## 8. DDA inference implementation (experimental)
 
-- No AI detection model is loaded.
-- No benchmark has been run.
+The DDA feasibility adapter, secure checkpoint loader, optional runtime dependency set, and manifest-driven scoring script are implemented on the follow-up branch. Exact official checkpoint metadata is verified against the Hugging Face Xet pointer: 1,255,621,296 bytes and SHA-256 `b27a31d39374803ddeff02bfabb2be76e190b04300490cddfafb24f683f37e3e`, at checkpoint revision `21a83bae9df37e5dd64ed995441764caf26ee1ab`. Official DDA code inspected at `08d6b414a33826403b9096cfdb7758d5eae12dbb`; DINOv2 Hub code pinned to `7b187bd4df8efce2cbcbbb67bd01532c19bf4c9c`.
+
+The adapter uses `torch.load(weights_only=True)`, strict tensor state loading, pre-load SHA-256 verification, explicit device selection, and official CenterCrop(336)/CLIP normalization. It reports `sigmoid(logit)` as an uncalibrated AI-like score (higher = more synthetic-like), not as a probability. The service returns an unthresholded score and no real/AI decision. Details and commands: [DDA and benchmark guide](../backend/services/ai-content-detection/docs/dda-and-benchmark.md).
+
+The DDA checkpoint and DINOv2 pretrained backbone are not committed or downloaded automatically. Runtime installation, checkpoint loading, parity checks, CPU/GPU measurements and independent benchmark execution remain outstanding. The optional model requirements are pinned separately from the lightweight API requirements.
+
+## 9. Current limitations and next milestones
+
+- DDA inference code is implemented but no model has yet been loaded in this environment.
+- No ImForensic benchmark has been run.
 - No accuracy or runtime claim is made.
-- No CPU/GPU compatibility has been measured.
+- CPU/GPU compatibility and resource usage remain unmeasured.
 - No training or dataset license has been approved for a commercial use case.
 - The service is not connected to Gateway or Kafka.
 
-Next: perform the DDA artifact/runtime feasibility spike, implement the pinned model adapter only after it passes security and compatibility review, then run the benchmark protocol and compare with UnivFD.
+Next: install the pinned runtime on target CPU/GPU hosts, verify a downloaded checkpoint, validate inference parity, and execute the source-/generator-disjoint benchmark. Only then decide whether score calibration and a production threshold are justified.

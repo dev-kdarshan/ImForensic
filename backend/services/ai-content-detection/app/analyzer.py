@@ -1,9 +1,4 @@
-"""Conservative AI-content detector service boundary.
-
-No model is bundled or loaded in this initial implementation. Until a model
-artifact, preprocessing contract, license review, and benchmark are approved,
-requests return a partial/inconclusive EngineResult rather than a guessed label.
-"""
+"""AI-content detector with an explicit not-configured fallback."""
 from __future__ import annotations
 
 import hashlib
@@ -11,10 +6,10 @@ import io
 import time
 from uuid import UUID, uuid4
 
-from PIL import Image, UnidentifiedImageError
+from PIL import Image, ImageOps, UnidentifiedImageError
 
 ENGINE = "ai-content-detection"
-ENGINE_VERSION = "0.1.0"
+ENGINE_VERSION = "0.2.0"
 SUPPORTED_FORMATS = {"JPEG", "PNG", "WEBP"}
 MAX_IMAGE_BYTES = 20 * 1024 * 1024
 MAX_IMAGE_PIXELS = 40_000_000
@@ -42,22 +37,13 @@ def inspect_image(content: bytes) -> dict:
         raise
     except (UnidentifiedImageError, OSError, Image.DecompressionBombError, Image.DecompressionBombWarning):
         raise UnsupportedImageError("Image is invalid or could not be decoded safely.") from None
-
     return {
-        "format": image_format,
-        "width": width,
-        "height": height,
-        "size_bytes": len(content),
-        "sha256": hashlib.sha256(content).hexdigest(),
+        "format": image_format, "width": width, "height": height,
+        "size_bytes": len(content), "sha256": hashlib.sha256(content).hexdigest(),
     }
 
 
 def analyze_image(content: bytes, analysis_id: str | None = None) -> dict:
-    """Validate input and return explicit not-configured semantics.
-
-    This is intentionally not a fake detector: no score or class is emitted
-    until a vetted model adapter has been installed and evaluated.
-    """
     started = time.perf_counter()
     image = inspect_image(content)
     try:
@@ -65,39 +51,53 @@ def analyze_image(content: bytes, analysis_id: str | None = None) -> dict:
     except ValueError:
         raise ValueError("analysis_id must be a UUID.") from None
 
-    return {
-        "analysis_id": resolved_id,
-        "engine": ENGINE,
-        "status": "partial",
-        "findings": {
-            "task": "whole_image_real_photograph_vs_fully_ai_generated_screening",
-            "outcome": "inconclusive",
-            "reason_code": "MODEL_NOT_CONFIGURED",
-            "detector": None,
-            "detector_version": None,
-            "model_artifact": None,
-            "input": image,
+    findings = {
+        "task": "whole_image_real_photograph_vs_fully_ai_generated_screening",
+        "outcome": "inconclusive",
+        "reason_code": "MODEL_NOT_CONFIGURED",
+        "detector": None, "detector_version": None, "model_artifact": None,
+        "input": image,
+        "preprocessing": {"status": "validation_only", "orientation": "model EXIF transpose only when DDA is enabled", "model_transform": None},
+        "score": None,
+        "score_semantics": "No detector score is available; no inference model is configured.",
+        "decision": "inconclusive", "decision_threshold": None, "calibrated_probability": None,
+    }
+    status = "partial"
+    warnings = ["No calibrated probability or authenticity/provenance verdict is produced."]
+    try:
+        from app.dda_model import ModelNotConfigured, predict
+        result = predict(content)
+        findings.update({
+            "outcome": "scored",
+            "reason_code": None,
+            "detector": result["detector"],
+            "detector_version": result["detector_version"],
+            "model_artifact": result["model_artifact"],
             "preprocessing": {
-                "status": "validation_only",
-                "decoded_format": image["format"],
-                "orientation": "EXIF orientation is not applied",
-                "model_transform": None,
+                "status": "applied",
+                "orientation": "EXIF transpose before RGB conversion",
+                "model_transform": result["preprocessing_version"],
             },
-            "score": None,
-            "score_semantics": "No detector score is available; no inference model is configured.",
-            "decision": "inconclusive",
-            "decision_threshold": None,
-            "calibrated_probability": None,
-            "interpretation": (
-                "The image passed format, integrity, and resource validation, but no AI-content "
-                "classification was performed because a vetted model artifact is not configured."
-            ),
-        },
-        "warnings": [
-            "This service currently validates image input only; it does not detect AI-generated content.",
-            "No raw model score, probability, or real/AI label is produced.",
-            "A future model must be evaluated on source-disjoint and generator-disjoint data before deployment.",
-        ],
-        "model_version": None,
+            "score": result["score"],
+            "score_semantics": result["score_semantics"],
+            "raw_logit": result["raw_logit"],
+            "device": result["device"],
+            "decision": "unthresholded",
+        })
+        status = "completed"
+        warnings.append("DDA score is uncalibrated and must not be interpreted as a probability.")
+    except ModelNotConfigured as exc:
+        findings["reason_code"] = "MODEL_NOT_CONFIGURED"
+        findings["score_semantics"] = str(exc)
+        warnings.append("DDA inference is disabled until a verified checkpoint and model dependencies are configured.")
+    except Exception as exc:
+        findings["reason_code"] = "MODEL_INFERENCE_FAILED"
+        findings["score_semantics"] = f"Inference unavailable: {type(exc).__name__}."
+        warnings.append("Model inference failed; no classification was produced.")
+
+    return {
+        "analysis_id": resolved_id, "engine": ENGINE, "status": status,
+        "findings": findings, "warnings": warnings,
+        "model_version": findings["detector_version"],
         "processing_time_ms": round((time.perf_counter() - started) * 1000, 3),
     }

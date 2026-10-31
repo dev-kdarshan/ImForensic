@@ -23,7 +23,7 @@ From the repository root:
 - Pixel Forensics engine: http://localhost:8003/docs
 - AI Content Detection engine: http://localhost:8004/docs
 
-The AI Content Detection service is not yet connected to the Gateway upload workflow. Its `/ready` endpoint returns HTTP 503 until a vetted model artifact is configured.
+The AI Content Detection service is not yet connected to the Gateway upload workflow. DDA inference is experimental and remains unready until a locally mounted checkpoint with the pinned SHA-256 is configured. See [DDA inference and benchmark guide](backend/services/ai-content-detection/docs/dda-and-benchmark.md).
 
 Run the frontend separately:
 
@@ -43,7 +43,7 @@ The evaluation harness consumes a CSV of predictions and applies a frozen thresh
 
     python backend/services/ai-content-detection/evaluation/evaluate_predictions.py predictions.csv --split test --threshold 0.5 --score-semantics raw_score --output metrics.json
 
-Do not treat raw model scores as probabilities. See the engine documentation for required dataset provenance and split controls.
+Do not treat raw model scores as probabilities. For DDA, install the optional pinned model dependencies separately and configure `DDA_CHECKPOINT_PATH` plus `DDA_CHECKPOINT_SHA256`; weights are not committed. See the DDA guide for inference and source-/generator-disjoint benchmarking.
 
 ## Current architecture and remaining work
 
