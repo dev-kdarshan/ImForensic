@@ -62,6 +62,18 @@ services:
       retries: 5
     restart: unless-stopped
 
+  watermark-detection:
+    build:
+      context: ../backend/services/watermark-detection
+    ports:
+      - "8005:8005"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8005/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
   kafka:
     image: apache/kafka:3.9.1
     hostname: kafka
