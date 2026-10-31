@@ -1,61 +1,35 @@
 # ImForensic
 
-ImForensic is a modular image-forensics project for examining metadata, provenance indicators, and other digital-image evidence.
+ImForensic is a modular image-forensics project for examining metadata, provenance indicators, and pixel-level evidence.
 
-## Implemented vertical slice
+## Implemented engines
 
-- React/Vite upload interface connected to the API Gateway.
-- FastAPI Gateway validates JPEG, PNG, and WebP uploads, computes SHA-256, stores files privately, and persists analysis records in SQLite.
-- Metadata & Provenance service extracts image dimensions, format, mode, EXIF, selected embedded metadata, software/XMP signals, and interpretation limitations.
-- Model Fingerprinting service extracts deterministic descriptive features: channel statistics/histograms/entropy, grayscale entropy/histogram, a simple edge-response statistic, and coarse spatial luminance measurements.
-- The Gateway sends the same uploaded bytes to both engines over internal HTTP, verifies each returned SHA-256, and persists independent per-engine results. One engine failure does not discard the other engine's result.
-- Docker Compose includes the Gateway, Metadata & Provenance, Model Fingerprinting, Kafka, PostgreSQL, and Redis services.
+- **Metadata & Provenance:** extracts dimensions, format, EXIF and selected embedded metadata/provenance signals.
+- **Model Fingerprinting:** extracts deterministic descriptive image features; does not attribute a generator/model.
+- **Pixel Forensics (baseline):** inspects JPEG quantization tables and reports bounded high-pass residual and edge-response statistics. It deliberately returns inconclusive rather than declaring tampering.
 
-**Scientific limitation:** Model Fingerprinting is not a trained generator classifier. It returns an inconclusive attribution outcome and does not provide model identification, candidate rankings, or calibrated probabilities. No labelled reference dataset or model weights are included. See the Model Fingerprinting documentation in docs/model-fingerprinting.md.
+The Pixel Forensics service is independently available on port 8003 in Docker Compose. It is not yet connected to the Gateway upload workflow; engine orchestration will be integrated after the planned engines are developed.
 
-Kafka asynchronous orchestration, the remaining four forensic engines, evidence correlation, SSE progress, C2PA signature verification, and AI-generation classification are not yet implemented. PostgreSQL and Redis are infrastructure services; the current Gateway persistence is SQLite.
+## Pixel Forensics
 
-## Run with Docker
+See [docs/pixel-forensics.md](docs/pixel-forensics.md) for method rationale, API, coordinate conventions, limitations, dataset/benchmark plan, and reproduction commands.
 
-From the repository root:
+Run only this service:
 
-    docker compose -f infrastructure/docker-compose.yml up --build
+    docker compose -f infrastructure/docker-compose.yml up --build pixel-forensics
 
-- API Gateway: http://localhost:8000 (API docs at /docs)
-- Metadata engine: http://localhost:8001/docs
-- Model Fingerprinting engine: http://localhost:8002/docs
+API: http://localhost:8003/docs
 
-Run the frontend separately:
+Run its tests:
 
-    cd frontend
-    npm install
-    npm run dev
-
-Set VITE_API_BASE_URL=http://localhost:8000 in frontend/.env if required.
-
-## Run backend services locally
-
-Start Metadata on port 8001 and Model Fingerprinting on port 8002 using their service directories and documented requirements. Then start the Gateway:
-
-    cd backend/api-gateway
-    python -m pip install -r requirements.txt
-    METADATA_SERVICE_URL=http://127.0.0.1:8001 MODEL_FINGERPRINT_SERVICE_URL=http://127.0.0.1:8002 uvicorn app.main:app --host 0.0.0.0 --port 8000
-
-On PowerShell:
-
-    $env:METADATA_SERVICE_URL = "http://127.0.0.1:8001"
-    $env:MODEL_FINGERPRINT_SERVICE_URL = "http://127.0.0.1:8002"
-
-## Tests
-
-For the Model Fingerprinting service:
-
-    cd backend/services/model-fingerprint
+    cd backend/services/pixel-forensics
     python -m pip install -r requirements.txt
     pytest -q
 
-For the Gateway, run its pytest suite from backend/api-gateway after installing requirements.txt. Tests have been authored but were not executed through the GitHub editing session; run both suites and a Docker Compose smoke test before merging.
+Tests and benchmarks must be executed in the target environment before claiming a verified pass or publishing performance figures.
 
-## Production considerations
+## Current architecture and remaining work
 
-The SQLite store and local volume are a development baseline. Before public deployment, add authentication/authorization, rate limiting, malware scanning, object-storage lifecycle policies, encryption/key management, operational monitoring, and a reviewed retention policy. Kafka orchestration, PostgreSQL application persistence, and C2PA verification require dedicated implementations and tests.
+The Gateway currently calls Metadata & Provenance and Model Fingerprinting synchronously. Pixel Forensics is an independent service. Kafka orchestration, PostgreSQL application persistence, the remaining engines, evidence correlation, and end-to-end asynchronous reporting remain future work.
+
+Production deployment still requires authentication/authorization, rate limiting, malware scanning, secure object storage, encryption/key management, monitoring, and a reviewed retention policy.
