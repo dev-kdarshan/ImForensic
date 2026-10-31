@@ -52,7 +52,7 @@ async def create_analysis(file: UploadFile = File(...)):
     _validate_image(content, extension)
 
     analysis_id = str(uuid4())
-    filename = Path(file.filename or "image").name.replace("\\\\", "_")
+    filename = Path(file.filename or "image").name.replace("\\", "_")
     sha256 = hashlib.sha256(content).hexdigest()
     try:
         stored_path = save_image(analysis_id, content, extension)
