@@ -37,11 +37,12 @@ The score is `sigmoid(raw_logit)`, oriented higher = more AI-generated/synthetic
 
 ## Install and run
 
-Install the CPU or CUDA-specific PyTorch wheel appropriate for the target host from https://pytorch.org/get-started/locally/, then:
+Install the matching PyTorch 2.6.0 / torchvision 0.21.0 wheel first (CPU example shown; use the CUDA index appropriate for your installed driver when targeting NVIDIA GPUs), then install the service's optional image dependency:
 
 ```bash
 cd backend/services/ai-content-detection
 python -m pip install -r requirements.txt
+python -m pip install --index-url https://download.pytorch.org/whl/cpu torch==2.6.0 torchvision==0.21.0
 python -m pip install -r requirements-model.txt
 export DDA_CHECKPOINT_PATH=/models/DDA_ckpt.pth
 export DDA_CHECKPOINT_SHA256=b27a31d39374803ddeff02bfabb2be76e190b04300490cddfafb24f683f37e3e
@@ -50,7 +51,7 @@ python scripts/check_runtime.py
 uvicorn app.main:app --host 0.0.0.0 --port 8004
 ```
 
-First model initialization requires access to the pinned DINOv2 source and pretrained backbone weights, unless already cached. The checkpoint is about 1.26 GB; reserve disk, RAM and VRAM headroom. GPU availability does not guarantee sufficient VRAM. CPU inference may be very slow; measure on the actual deployment hardware. No CPU/GPU performance claim is made by this change.
+For CUDA, replace the CPU wheel index with the PyTorch-provided CUDA 12.4 wheel index (or the index matching the target build) and rebuild the service image with `TORCH_INDEX_URL`. First model initialization requires access to the pinned DINOv2 source and pretrained backbone weights, unless already cached. The checkpoint is about 1.26 GB; reserve disk, RAM and VRAM headroom. GPU availability does not guarantee sufficient VRAM. CPU inference may be very slow; measure on the actual deployment hardware. No CPU/GPU performance claim is made by this change.
 
 ## Independent benchmark
 
