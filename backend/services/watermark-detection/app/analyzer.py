@@ -11,7 +11,6 @@ import json
 import logging
 import time
 import warnings
-from datetime import datetime, timezone
 from uuid import UUID, uuid4
 from typing import Any
 
@@ -24,14 +23,6 @@ MAX_IMAGE_BYTES = 20 * 1024 * 1024
 MAX_IMAGE_PIXELS = 40_000_000
 MAX_MANIFEST_SUMMARY_ITEMS = 20
 logger = logging.getLogger(__name__)
-
-
-def _safe_metadata_value(value: Any) -> str | None:
-    if isinstance(value, bytes):
-        return None
-    if isinstance(value, (str, int, float, bool)):
-        return str(value)[:256]
-    return None
 
 
 def _extract_metadata_candidates(image: Image.Image) -> list[dict[str, str]]:
@@ -71,20 +62,25 @@ def _summarize_manifest_store(store: dict[str, Any]) -> dict[str, Any]:
                 for key in ("code", "url", "explanation", "success")
                 if key in item and isinstance(item[key], (str, int, float, bool))
             })
+    generator_info = active_manifest.get("claim_generator_info", [])
+    if not isinstance(generator_info, list):
+        generator_info = []
+    assertions = active_manifest.get("assertions", [])
+    if not isinstance(assertions, list):
+        assertions = []
     return {
         "active_manifest": active if isinstance(active, str) else None,
         "manifest_count": len(manifests) if isinstance(manifests, dict) else 0,
         "claim_generator": str(active_manifest.get("claim_generator", ""))[:256] or None,
         "claim_generator_info": [
             {"name": str(item.get("name", ""))[:128], "version": str(item.get("version", ""))[:64]}
-            for item in active_manifest.get("claim_generator_info", [])[:10]
-            if isinstance(item, dict)
-        ] if isinstance(active_manifest.get("claim_generator_info", []), list) else [],
+            for item in generator_info[:10] if isinstance(item, dict)
+        ],
         "assertion_labels": [
             str(item.get("label", ""))[:160]
-            for item in active_manifest.get("assertions", [])[:MAX_MANIFEST_SUMMARY_ITEMS]
+            for item in assertions[:MAX_MANIFEST_SUMMARY_ITEMS]
             if isinstance(item, dict) and item.get("label")
-        ] if isinstance(active_manifest.get("assertions", []), list) else [],
+        ],
         "validation_status": validation_summary,
         "validation_status_count": len(validation),
     }
