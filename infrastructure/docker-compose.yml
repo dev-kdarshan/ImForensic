@@ -9,126 +9,131 @@ services:
     build:
       context: ../backend/api-gateway
     environment:
-      METADATA_SERVICE_URL: http://metadata-provenance:8001
-      MODEL_FINGERPRINT_SERVICE_URL: http://model-fingerprint:8002
-      ENGINE_TIMEOUT_SECONDS: 30
+      ORCHESTRATOR_URL: http://orchestrator-api:8007
+      ENGINE_TIMEOUT_SECONDS: 20
       IMFORENSIC_DB_PATH: /app/data/imforensic.sqlite3
       IMFORENSIC_UPLOAD_DIR: /app/data/uploads
+      IMFORENSIC_INTERNAL_TOKEN: ${IMFORENSIC_INTERNAL_TOKEN:-local-dev-only-change-me}
       MAX_UPLOAD_MB: 20
       CORS_ORIGINS: http://localhost:5173
-    ports:
-      - "8000:8000"
-    volumes:
-      - imforensic_data:/app/data
+    ports: ["8000:8000"]
+    volumes: [imforensic_data:/app/data]
     depends_on:
-      metadata-provenance:
-        condition: service_healthy
-      model-fingerprint:
-        condition: service_healthy
+      metadata-provenance: {condition: service_healthy}
+      model-fingerprint: {condition: service_healthy}
+      orchestrator-api: {condition: service_healthy}
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      test: ["CMD","python","-c","import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 10s
       timeout: 3s
       retries: 5
     restart: unless-stopped
 
   metadata-provenance:
-    build:
-      context: ../backend/services/metadata-provenance
+    build: {context: ../backend/services/metadata-provenance}
     ports: ["8001:8001"]
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"]
-      interval: 10s
-      timeout: 3s
-      retries: 5
+    healthcheck: {test: ["CMD","python","-c","import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"], interval: 10s, timeout: 3s, retries: 5}
     restart: unless-stopped
-
   model-fingerprint:
-    build:
-      context: ../backend/services/model-fingerprint
+    build: {context: ../backend/services/model-fingerprint}
     ports: ["8002:8002"]
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8002/ready')"]
-      interval: 10s
-      timeout: 3s
-      retries: 5
+    healthcheck: {test: ["CMD","python","-c","import urllib.request; urllib.request.urlopen('http://localhost:8002/ready')"], interval: 10s, timeout: 3s, retries: 5}
     restart: unless-stopped
-
   pixel-forensics:
-    build:
-      context: ../backend/services/pixel-forensics
+    build: {context: ../backend/services/pixel-forensics}
     ports: ["8003:8003"]
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8003/ready')"]
-      interval: 10s
-      timeout: 3s
-      retries: 5
+    healthcheck: {test: ["CMD","python","-c","import urllib.request; urllib.request.urlopen('http://localhost:8003/ready')"], interval: 10s, timeout: 3s, retries: 5}
     restart: unless-stopped
-
   ai-content-detection:
-    build:
-      context: ../backend/services/ai-content-detection
+    build: {context: ../backend/services/ai-content-detection}
     ports: ["8004:8004"]
     environment:
       DDA_CHECKPOINT_PATH: /models/DDA_ckpt.pth
-    volumes:
-      - dda_torch_cache:/root/.cache/torch
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8004/health')"]
-      interval: 15s
-      timeout: 5s
-      retries: 3
+    volumes: [dda_torch_cache:/root/.cache/torch]
+    healthcheck: {test: ["CMD","python","-c","import urllib.request; urllib.request.urlopen('http://localhost:8004/health')"], interval: 15s, timeout: 5s, retries: 3}
     restart: unless-stopped
-
   watermark-detection:
-    build:
-      context: ../backend/services/watermark-detection
+    build: {context: ../backend/services/watermark-detection}
     ports: ["8005:8005"]
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8005/health')"]
-      interval: 15s
-      timeout: 5s
-      retries: 3
+    healthcheck: {test: ["CMD","python","-c","import urllib.request; urllib.request.urlopen('http://localhost:8005/health')"], interval: 15s, timeout: 5s, retries: 3}
     restart: unless-stopped
-
   visual-consistency:
-    build:
-      context: ../backend/services/visual-consistency
+    build: {context: ../backend/services/visual-consistency}
     ports: ["8006:8006"]
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8006/ready')"]
-      interval: 10s
-      timeout: 3s
-      retries: 5
+    healthcheck: {test: ["CMD","python","-c","import urllib.request; urllib.request.urlopen('http://localhost:8006/ready')"], interval: 10s, timeout: 3s, retries: 5}
     restart: unless-stopped
 
   orchestrator-api:
     build:
       context: ..
       dockerfile: backend/orchestrator/Dockerfile
-    environment:
-      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+    environment: {KAFKA_BOOTSTRAP_SERVERS: kafka:9092}
     ports: ["8007:8007"]
-    depends_on:
-      kafka:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8007/health')"]
-      interval: 10s
-      timeout: 3s
-      retries: 5
+    depends_on: {kafka: {condition: service_healthy}}
+    healthcheck: {test: ["CMD","python","-c","import urllib.request; urllib.request.urlopen('http://localhost:8007/health')"], interval: 10s, timeout: 3s, retries: 5}
     restart: unless-stopped
-
   orchestrator-worker:
     build:
       context: ..
       dockerfile: backend/orchestrator/Dockerfile
-    command: ["python", "-m", "app.worker"]
-    environment:
-      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+    command: ["python","-m","app.worker"]
+    environment: {KAFKA_BOOTSTRAP_SERVERS: kafka:9092}
+    depends_on: {kafka: {condition: service_healthy}}
+    restart: unless-stopped
+
+  engine-worker-metadata:
+    build: {context: .., dockerfile: backend/orchestrator/Dockerfile}
+    command: ["python","-m","app.engine_worker"]
+    environment: {<<: *engine_worker_env, ENGINE_NAME: metadata-provenance}
     depends_on:
-      kafka:
-        condition: service_healthy
+      kafka: {condition: service_healthy}
+      api-gateway: {condition: service_healthy}
+      metadata-provenance: {condition: service_healthy}
+    restart: unless-stopped
+  engine-worker-fingerprint:
+    build: {context: .., dockerfile: backend/orchestrator/Dockerfile}
+    command: ["python","-m","app.engine_worker"]
+    environment: {<<: *engine_worker_env, ENGINE_NAME: model-fingerprint}
+    depends_on:
+      kafka: {condition: service_healthy}
+      api-gateway: {condition: service_healthy}
+      model-fingerprint: {condition: service_healthy}
+    restart: unless-stopped
+  engine-worker-pixel:
+    build: {context: .., dockerfile: backend/orchestrator/Dockerfile}
+    command: ["python","-m","app.engine_worker"]
+    environment: {<<: *engine_worker_env, ENGINE_NAME: pixel-forensics}
+    depends_on:
+      kafka: {condition: service_healthy}
+      api-gateway: {condition: service_healthy}
+      pixel-forensics: {condition: service_healthy}
+    restart: unless-stopped
+  engine-worker-ai:
+    build: {context: .., dockerfile: backend/orchestrator/Dockerfile}
+    command: ["python","-m","app.engine_worker"]
+    environment: {<<: *engine_worker_env, ENGINE_NAME: ai-content-detection}
+    depends_on:
+      kafka: {condition: service_healthy}
+      api-gateway: {condition: service_healthy}
+      ai-content-detection: {condition: service_healthy}
+    restart: unless-stopped
+  engine-worker-watermark:
+    build: {context: .., dockerfile: backend/orchestrator/Dockerfile}
+    command: ["python","-m","app.engine_worker"]
+    environment: {<<: *engine_worker_env, ENGINE_NAME: watermark-detection}
+    depends_on:
+      kafka: {condition: service_healthy}
+      api-gateway: {condition: service_healthy}
+      watermark-detection: {condition: service_healthy}
+    restart: unless-stopped
+  engine-worker-visual:
+    build: {context: .., dockerfile: backend/orchestrator/Dockerfile}
+    command: ["python","-m","app.engine_worker"]
+    environment: {<<: *engine_worker_env, ENGINE_NAME: visual-consistency}
+    depends_on:
+      kafka: {condition: service_healthy}
+      api-gateway: {condition: service_healthy}
+      visual-consistency: {condition: service_healthy}
     restart: unless-stopped
 
   evidence-correlation:
@@ -136,18 +141,30 @@ services:
       context: ..
       dockerfile: backend/evidence-correlation/Dockerfile
     ports: ["8008:8008"]
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8008/health')"]
-      interval: 10s
-      timeout: 3s
-      retries: 5
+    healthcheck: {test: ["CMD","python","-c","import urllib.request; urllib.request.urlopen('http://localhost:8008/health')"], interval: 10s, timeout: 3s, retries: 5}
+    restart: unless-stopped
+  result-collector:
+    build:
+      context: ..
+      dockerfile: backend/orchestrator/Dockerfile
+    command: ["python","-m","app.result_collector"]
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      GATEWAY_INTERNAL_URL: http://api-gateway:8000
+      EVIDENCE_CORRELATION_URL: http://evidence-correlation:8008
+      IMFORENSIC_INTERNAL_TOKEN: ${IMFORENSIC_INTERNAL_TOKEN:-local-dev-only-change-me}
+      RESULT_DB_PATH: /var/lib/imforensic/results.sqlite3
+    volumes: [orchestration_data:/var/lib/imforensic]
+    depends_on:
+      kafka: {condition: service_healthy}
+      api-gateway: {condition: service_healthy}
+      evidence-correlation: {condition: service_healthy}
     restart: unless-stopped
 
   kafka:
     image: apache/kafka:3.9.1
     hostname: kafka
-    ports:
-      - "9092:9094"
+    ports: ["9092:9094"]
     environment:
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: broker,controller
@@ -163,22 +180,16 @@ services:
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
       CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
     healthcheck:
-      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list >/dev/null 2>&1"]
+      test: ["CMD-SHELL","/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list >/dev/null 2>&1"]
       interval: 10s
       timeout: 5s
       retries: 10
       start_period: 20s
-
   postgres:
     image: postgres:16
-    environment:
-      POSTGRES_DB: imforensic
-      POSTGRES_USER: imforensic
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
+    environment: {POSTGRES_DB: imforensic, POSTGRES_USER: imforensic, POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}}
     ports: ["5432:5432"]
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-
+    volumes: [postgres_data:/var/lib/postgresql/data]
   redis:
     image: redis:7-alpine
     ports: ["6379:6379"]
@@ -186,15 +197,5 @@ services:
 volumes:
   postgres_data:
   imforensic_data:
-  dda_torch_cache:  engine-worker-metadata:
-    build: {context: .., dockerfile: backend/orchestrator/Dockerfile}
-    command: ["python","-m","app.engine_worker"]
-    environment:
-      <<: *engine_worker_env
-      ENGINE_NAME: metadata-provenance
-    depends_on:
-      kafka: {condition: service_healthy}
-      api-gateway: {condition: service_healthy}
-      metadata-provenance: {condition: service_healthy}
-    restart: unless-stopped
-
+  dda_torch_cache:
+  orchestration_data:
