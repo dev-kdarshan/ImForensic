@@ -1,1 +1,5 @@
+# Optional inference dependencies. Install a CPU or CUDA-specific PyTorch wheel
+# from https://pytorch.org/get-started/locally/ before installing this file.
+torch==2.6.0
+torchvision==0.21.0
 Pillow==12.3.0
