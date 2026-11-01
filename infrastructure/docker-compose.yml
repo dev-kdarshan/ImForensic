@@ -2,7 +2,10 @@ x-engine-worker-env: &engine_worker_env
   KAFKA_BOOTSTRAP_SERVERS: kafka:9092
   GATEWAY_INTERNAL_URL: http://api-gateway:8000
   IMFORENSIC_INTERNAL_TOKEN: ${IMFORENSIC_INTERNAL_TOKEN:-local-dev-only-change-me}
+  DDA_ENGINE_HTTP_TIMEOUT_SECONDS: 900
   ENGINE_HTTP_TIMEOUT_SECONDS: 120
+  ENGINE_MAX_ATTEMPTS: 3
+  ENGINE_MAX_POLL_INTERVAL_MS: 2400000
 
 services:
   api-gateway:
@@ -55,8 +58,13 @@ services:
       DDA_CHECKPOINT_PATH: /models/DDA_ckpt.pth
       DDA_CHECKPOINT_SHA256: b27a31d39374803ddeff02bfabb2be76e190b04300490cddfafb24f683f37e3e
       DDA_DEVICE: auto
+      DDA_IDEMPOTENCY_DB_PATH: /app/data/dda_idempotency.sqlite3
+      DDA_IDEMPOTENCY_LEASE_SECONDS: 1800
+      DDA_IDEMPOTENCY_WAIT_SECONDS: 570
+      DDA_MAX_CONCURRENT_INFERENCES: 1
     volumes:
       - dda_torch_cache:/root/.cache/torch
+      - dda_idempotency_data:/app/data
       - ../models/dda:/models:ro
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8004/health')"]
@@ -166,6 +174,7 @@ services:
       EVIDENCE_CORRELATION_URL: http://evidence-correlation:8008
       IMFORENSIC_INTERNAL_TOKEN: ${IMFORENSIC_INTERNAL_TOKEN:-local-dev-only-change-me}
       RESULT_DB_PATH: /var/lib/imforensic/results.sqlite3
+      INTERNAL_HTTP_TIMEOUT_SECONDS: 30
     volumes: [orchestration_data:/var/lib/imforensic]
     depends_on:
       kafka: {condition: service_healthy}
@@ -213,3 +222,4 @@ volumes:
   imforensic_data:
   dda_torch_cache:
   orchestration_data:
+  dda_idempotency_data:
