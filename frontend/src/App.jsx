@@ -41,20 +41,8 @@ const download = (blob, name) => {
 };
 const safeName = (name) => (name || 'examination').replace(/[^a-z0-9._-]+/gi, '_');
 
-function Status({ value = 'waiting' }) {
-  const label = String(value).replaceAll('_', ' ');
-  return <span className={'status status-' + String(value).toLowerCase()}>{label}</span>;
-}
-function Findings({ item }) {
-  const result = item?.result || item || {};
-  const findings = result.findings ?? result.observations ?? result.summary;
-  if (Array.isArray(findings) && findings.length) return <ul className="finding-list">{findings.slice(0, 8).map((f, i) => <li key={i}>{typeof f === 'string' ? f : f.description || f.message || f.name || pretty(f)}</li>)}</ul>;
-  if (typeof findings === 'string' && findings) return <p className="finding-text">{findings}</p>;
-  return <p className="muted small">No normalized findings supplied by this engine.</p>;
-}
 export default function App() {
   const [file, setFile] = useState(null);
-  const [dragging, setDragging] = useState(false);
   const [health, setHealth] = useState('checking');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -89,35 +77,14 @@ export default function App() {
     return () => { cancelled = true; clearTimeout(timer); };
   }, [analysis, timedOut]);
 
-  const expected = analysis?.expected_engines?.length ? analysis.expected_engines : ENGINES.map(([id]) => id);
-  const results = analysis?.engine_results || {};
-  const received = Object.keys(results).length;
-  const correlation = analysis?.correlation;
-  const progress = expected.length ? Math.min(100, Math.round(received / expected.length * 100)) : 0;
-  const resultFilename = useMemo(() => analysis?.filename || file?.name || 'No evidence selected', [analysis, file]);
-
-  function choose(candidate) {
-    setError('');
-    if (!candidate) return;
-    if (!['image/jpeg', 'image/png', 'image/webp'].includes(candidate.type)) { setFile(null); setError('Unsupported format. Select a JPEG, PNG or WebP image.'); return; }
-    if (candidate.size > MAX_BYTES) { setFile(null); setError('The selected image exceeds the 20 MB upload limit.'); return; }
-    setFile(candidate); setAnalysis(null); setLastUpdated(null);
-  }
-  async function submit(e) {
-    e.preventDefault();
+  async function submit(event) {
+    event.preventDefault();
     if (!file || busy) return;
     setBusy(true); setError(''); setAnalysis(null); setTimedOut(false); setElapsed(0);
     const start = Date.now(); setStartedAt(start);
     try { setAnalysis(await createAnalysis(file)); }
     catch (err) { setError(err.message || 'Could not queue analysis.'); setStartedAt(null); }
     finally { setBusy(false); }
-  }
-  function downloadReport() {
-    if (!analysis) return;
-    const blob = new Blob([pretty(analysis)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = url; a.download = 'imforensic-' + analysis.analysis_id + '.json'; a.click();
-    URL.revokeObjectURL(url);
   }
 
   const engineResults = analysis?.engine_results || {};
@@ -203,6 +170,7 @@ export default function App() {
           {file && <p className="muted">{file.name} · {sizeLabel(file.size)}</p>}
           <button disabled={!file || busy || health === 'offline'}>{busy ? 'Submitting…' : 'Analyze with all six engines'}</button>
         </form>
+        {error && <p className="error" role="alert">{error}</p>}
       </section>
       {analysis && <section className="panel" aria-live="polite">
         <div className="result-heading"><h2>Examination overview</h2><span className={'status ' + analysis.status}>{analysis.status}</span></div>
@@ -245,5 +213,5 @@ export default function App() {
       </section>}
       <p className="footer">A completed execution means the configured engine returned a result. It does not mean the image is authentic. Configure production secrets, access control, retention and encryption before deployment.</p>
     </main>
-  </div>;
+  );
 }
