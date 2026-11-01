@@ -1,6 +1,7 @@
-"""FastAPI entry point for the AI Content Detection Engine."""
+""""FastAPI entry point for the AI Content Detection Engine."""
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 from pathlib import Path
@@ -48,7 +49,9 @@ async def analyze(file: UploadFile = File(...), analysis_id: str | None = Form(d
     if len(content) > MAX_IMAGE_BYTES:
         raise HTTPException(status_code=413, detail="Image exceeds the 20 MB analysis limit.")
     try:
-        return analyze_image(content, analysis_id)
+        # DDA inference is synchronous and CPU-heavy. Run it in a worker thread so
+        # this async event loop can continue serving health/readiness/other requests.
+        return await asyncio.to_thread(analyze_image, content, analysis_id)
     except UnsupportedImageError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from None
     except ValueError as exc:
