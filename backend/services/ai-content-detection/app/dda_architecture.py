@@ -69,10 +69,10 @@ class DINOv2Model(nn.Module):
         super().__init__()
         # Pin remote model code to a reviewed commit; no floating "main" branch.
         self.model = torch.hub.load(
-            "facebookresearch/dinov2:7b187bd4df8efce2cbcbbb67bd01532c19bf4c9c",
+            "/opt/dinov2",
             "dinov2_vitl14",
+            source="local",
             pretrained=True,
-            trust_repo=True,
         )
         self.fc = nn.Linear(DINOV2_CHANNELS["dinov2_vitl14"], 1)
 

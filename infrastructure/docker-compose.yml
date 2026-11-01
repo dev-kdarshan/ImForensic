@@ -45,12 +45,24 @@ services:
     healthcheck: {test: ["CMD","python","-c","import urllib.request; urllib.request.urlopen('http://localhost:8003/ready')"], interval: 10s, timeout: 3s, retries: 5}
     restart: unless-stopped
   ai-content-detection:
-    build: {context: ../backend/services/ai-content-detection}
+    build:
+      context: ../backend/services/ai-content-detection
+      args:
+        ENABLE_DDA: "true"
+        TORCH_INDEX_URL: https://download.pytorch.org/whl/cpu
     ports: ["8004:8004"]
     environment:
       DDA_CHECKPOINT_PATH: /models/DDA_ckpt.pth
-    volumes: [dda_torch_cache:/root/.cache/torch]
-    healthcheck: {test: ["CMD","python","-c","import urllib.request; urllib.request.urlopen('http://localhost:8004/health')"], interval: 15s, timeout: 5s, retries: 3}
+      DDA_CHECKPOINT_SHA256: b27a31d39374803ddeff02bfabb2be76e190b04300490cddfafb24f683f37e3e
+      DDA_DEVICE: auto
+    volumes:
+      - dda_torch_cache:/root/.cache/torch
+      - ../models/dda:/models:ro
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8004/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
     restart: unless-stopped
   watermark-detection:
     build: {context: ../backend/services/watermark-detection}
@@ -187,12 +199,14 @@ services:
       start_period: 20s
   postgres:
     image: postgres:16
-    environment: {POSTGRES_DB: imforensic, POSTGRES_USER: imforensic, POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}}
-    ports: ["5432:5432"]
-    volumes: [postgres_data:/var/lib/postgresql/data]
-  redis:
-    image: redis:7-alpine
-    ports: ["6379:6379"]
+    environment:
+      POSTGRES_DB: imforensic
+      POSTGRES_USER: imforensic
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-change-me}"
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
 
 volumes:
   postgres_data:

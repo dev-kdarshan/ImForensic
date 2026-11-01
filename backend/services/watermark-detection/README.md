@@ -47,7 +47,7 @@ From `infrastructure/`, use the Compose service `watermark-detection`. The C2PA 
 
 ## License and supply-chain notes
 
-The C2PA Python binding is published by the Content Authenticity Initiative and its upstream repository declares Apache-2.0 and MIT licensing. The dependency is pinned to `c2pa-python==0.38.3`; its native wheel size and platform availability should be checked for each target architecture. No model weights, external detector package, private key, or signing operation is included.
+The C2PA Python binding is published by the Content Authenticity Initiative and its upstream repository declares Apache-2.0 and MIT licensing. The dependency is pinned to `c2pa-python==0.38.1`; its native wheel size and platform availability should be checked for each target architecture. No model weights, external detector package, private key, or signing operation is included.
 
 ## Evaluation still required
 

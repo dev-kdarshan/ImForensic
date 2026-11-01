@@ -28,7 +28,7 @@ C2PA credentials are provenance information, not watermark pixels or an invisibl
 
 ## 4. Method and dependency review
 
-The C2PA Python binding is the official Python binding to the C2PA Rust implementation. Upstream usage documents stream-based reading through `Reader(mime_type, stream)` and `reader.json()`, with validation errors represented in the report's `validation_status`. The project declares MIT OR Apache-2.0. The dependency is pinned to `c2pa-python==0.38.3`.
+The C2PA Python binding is the official Python binding to the C2PA Rust implementation. Upstream usage documents stream-based reading through `Reader(mime_type, stream)` and `reader.json()`, with validation errors represented in the report's `validation_status`. The project declares MIT OR Apache-2.0. The dependency is pinned to `c2pa-python==0.38.1`.
 
 Pillow is used only for safe image decoding, dimension checks, and metadata-key inspection. It is not used as a watermark detector. No OCR, learned model, proprietary SDK, external model weights, signing keys, or third-party detector is introduced.
 
