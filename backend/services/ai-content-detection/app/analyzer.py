@@ -3,10 +3,13 @@ from __future__ import annotations
 
 import hashlib
 import io
+import logging
 import time
 from uuid import UUID, uuid4
 
 from PIL import Image, ImageOps, UnidentifiedImageError
+
+logger = logging.getLogger("imforensic.ai_content_detection.analyzer")
 
 ENGINE = "ai-content-detection"
 ENGINE_VERSION = "0.2.0"
@@ -64,9 +67,15 @@ def analyze_image(content: bytes, analysis_id: str | None = None) -> dict:
     }
     status = "partial"
     warnings = ["No calibrated probability or authenticity/provenance verdict is produced."]
+    inference_started = time.perf_counter()
     try:
         from app.dda_model import ModelNotConfigured, predict
         result = predict(content)
+        inference_ms = round((time.perf_counter() - inference_started) * 1000, 3)
+        logger.info(
+            "DDA inference completed analysis_id=%s duration_ms=%s device=%s",
+            resolved_id, inference_ms, result.get("device"),
+        )
         findings.update({
             "outcome": "scored",
             "reason_code": None,
@@ -87,17 +96,32 @@ def analyze_image(content: bytes, analysis_id: str | None = None) -> dict:
         status = "completed"
         warnings.append("DDA score is uncalibrated and must not be interpreted as a probability.")
     except ModelNotConfigured as exc:
+        inference_ms = round((time.perf_counter() - inference_started) * 1000, 3)
+        logger.warning(
+            "DDA is not configured analysis_id=%s duration_ms=%s reason=%s",
+            resolved_id, inference_ms, str(exc),
+        )
         findings["reason_code"] = "MODEL_NOT_CONFIGURED"
         findings["score_semantics"] = str(exc)
         warnings.append("DDA inference is disabled until a verified checkpoint and model dependencies are configured.")
     except Exception as exc:
+        inference_ms = round((time.perf_counter() - inference_started) * 1000, 3)
+        logger.exception(
+            "DDA inference failed analysis_id=%s duration_ms=%s error_type=%s",
+            resolved_id, inference_ms, type(exc).__name__,
+        )
         findings["reason_code"] = "MODEL_INFERENCE_FAILED"
         findings["score_semantics"] = f"Inference unavailable: {type(exc).__name__}."
         warnings.append("Model inference failed; no classification was produced.")
 
+    total_ms = round((time.perf_counter() - started) * 1000, 3)
+    logger.info(
+        "AI analysis finished analysis_id=%s status=%s total_ms=%s",
+        resolved_id, status, total_ms,
+    )
     return {
         "analysis_id": resolved_id, "engine": ENGINE, "status": status,
         "findings": findings, "warnings": warnings,
         "model_version": findings["detector_version"],
-        "processing_time_ms": round((time.perf_counter() - started) * 1000, 3),
+        "processing_time_ms": total_ms,
     }
