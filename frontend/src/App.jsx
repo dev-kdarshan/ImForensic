@@ -49,6 +49,23 @@ function Status({ value = 'waiting' }) {
   const label = String(value).replaceAll('_', ' ');
   return <span className={'status status-' + String(value).toLowerCase()}>{label}</span>;
 }
+function getAiAssessment(item) {
+  if (!item) return { label: 'AI-generation assessment unavailable', detail: 'The AI content detection engine has not returned a result.' };
+  const data = rawFor(item);
+  const sources = [data, data.findings, data.observations, data.result, data.output].filter(Boolean);
+  for (const source of sources) {
+    if (typeof source !== 'object') continue;
+    for (const key of ['is_ai_generated', 'ai_generated', 'is_synthetic', 'synthetic']) {
+      if (typeof source[key] === 'boolean') return { label: source[key] ? 'AI-generated indicators reported' : 'AI-generated indicators not reported', detail: 'Based on the engine boolean field ' + key + '. This is an engine-specific result, not proof of origin.' };
+    }
+    for (const key of ['classification', 'prediction', 'predicted_label', 'label', 'verdict', 'decision']) {
+      if (typeof source[key] === 'string' && source[key].trim()) return { label: humanize(source[key]), detail: 'Classification returned by the AI content detection engine. Interpret using the engine documented score semantics.' };
+    }
+  }
+  const scores = flatten(data).filter(([key]) => /score|confidence/i.test(key));
+  if (scores.length) return { label: 'AI detection score returned; no explicit classification', detail: scores.slice(0, 2).map(([key, value]) => key + ': ' + value).join(' · ') + '. A score alone is not a probability or a definitive AI-generation verdict.' };
+  return { label: 'AI-generation assessment inconclusive from returned fields', detail: 'No recognized classification field was returned. Inspect the technical response; no AI-generated/not-AI-generated conclusion can be supported.' };
+}
 function Findings({ item }) {
   if (!item) return <p className="muted small">No engine response has been received yet.</p>;
   const result = item.result?.raw_result ?? item.result ?? item;
@@ -176,6 +193,7 @@ export default function App() {
       write(String(index + 1).padStart(2, '0') + '  ' + meta[1], 10, true);
       write('Execution status: ' + (item?.status || 'No response received'), 8, true);
       write(statusMessage(item), 8);
+      if (id === 'ai-content-detection') { const assessment = getAiAssessment(item); write('AI-generation assessment: ' + assessment.label, 8, true); write(assessment.detail, 8); }
       const result = rawFor(item);
       const normalized = result.findings ?? result.observations ?? result.summary;
       if (Array.isArray(normalized) && normalized.length) normalized.slice(0, 8).forEach(f => write('• ' + (typeof f === 'string' ? f : f.description || f.message || f.name || 'Observation recorded'), 8));
@@ -238,23 +256,24 @@ export default function App() {
             <div className="record-top"><div><span className="field-label">EXAMINATION IDENTIFIER</span><code>{analysis.analysis_id}</code></div><Status value={analysis.status} /></div>
             <div className="record-grid"><div><span className="field-label">Evidence file</span><b>{resultFilename}</b></div><div><span className="field-label">Submitted</span><b>{safeDate(analysis.created_at)}</b></div><div><span className="field-label">File size</span><b>{formatBytes(analysis.size_bytes || file?.size || 0)}</b></div><div><span className="field-label">Media type</span><b>{analysis.content_type || file?.type || '—'}</b></div></div>
             <div className="hash-row"><span className="field-label">SHA-256 INTEGRITY REFERENCE</span><code>{analysis.sha256 || 'Not returned by gateway'}</code></div>
-            <div className="timing-row"><div><span className="field-label">ELAPSED TIME</span><b>{elapsedLabel}</b></div><div><span className="field-label">ESTIMATED PROCESSING WINDOW</span><b>About 2 minutes <small>(indicative)</small></b></div><div><span className="field-label">LAST STATUS UPDATE</span><b>{lastUpdated ? lastUpdated.toLocaleTimeString() : 'Awaiting update'}</b></div></div>
+            <div className="timing-row"><div><span className="field-label">ELAPSED TIME</span><b>{elapsedLabel}</b></div><div><span className="field-label">ESTIMATED PROCESSING WINDOW</span><b>Indicative processing target: 2 minutes</b></div><div><span className="field-label">LAST STATUS UPDATE</span><b>{lastUpdated ? lastUpdated.toLocaleTimeString() : 'Awaiting update'}</b></div></div>
             <div className="progress-head"><b>Engine response collection</b><span>{received} / {expected.length} received</span></div><div className="progress-track"><div style={{width: progress + '%'}} /></div>
-            <small className="muted">The estimate is indicative, not a guaranteed completion time.</small>
+            <small className="muted">This is a fixed initial waiting target, not a measured prediction or guaranteed completion time.</small>
             {timedOut && !isComplete && <p className="timeout-notice" role="status">Analysis is taking longer than expected. Please wait a while. No further action has been taken. Automatic status checks have stopped.</p>}
             {!isComplete && !timedOut && <p className="muted small">Status is refreshed automatically while the estimated waiting window remains active.</p>}
           </div>
           <div className="engine-grid">{expected.map(name => {
             const meta = ENGINES.find(x => x[0] === name) || [name, humanize(name), 'Configured analysis engine'];
             const item = results[name]; const status = item?.status || 'waiting';
-            return <article className="engine-card" key={name}><div className="engine-card-head"><span className="engine-code">{String(expected.indexOf(name) + 1).padStart(2, '0')}</span><Status value={status} /></div><h3>{meta[1]}</h3><p>{meta[2]}</p><p className="engine-summary">{statusMessage(item)}</p><Findings item={item}/>{item && <details className="raw-details"><summary>Inspect technical response</summary><pre>{pretty(rawFor(item))}</pre></details>}</article>;
+            const aiAssessment = name === 'ai-content-detection' ? getAiAssessment(item) : null;
+            return <article className="engine-card" key={name}><div className="engine-card-head"><span className="engine-code">{String(expected.indexOf(name) + 1).padStart(2, '0')}</span><Status value={status} /></div><h3>{meta[1]}</h3><p>{meta[2]}</p><p className="engine-summary">{statusMessage(item)}</p><Findings item={item}/>{aiAssessment && <div className="ai-assessment"><span className="field-label">AI-GENERATION ASSESSMENT</span><strong>{aiAssessment.label}</strong><p>{aiAssessment.detail}</p></div>}{item && <details className="raw-details"><summary>Inspect technical response</summary><pre>{pretty(rawFor(item))}</pre></details>}</article>;
           })}</div>
         </section>
 
         <section className="section-block" id="correlation">
           <div className="section-heading"><div><span className="section-index">03</span><div><h2>Evidence correlation</h2><p>Cross-engine observations and execution completeness.</p></div></div>{correlation && <Status value={correlation.status} />}</div>
           <div className="correlation-card">
-            {!correlation ? <div className="pending-correlation"><b>Correlation report pending</b><p className="muted">The consolidated report will appear when the backend evidence-correlation service returns it.</p></div> : <>
+            {!correlation ? <div className="pending-correlation"><b>{TERMINAL.includes(String(analysis.status || '').toLowerCase()) ? 'Correlation data not returned by the API' : 'Correlation report pending'}</b><p className="muted">{TERMINAL.includes(String(analysis.status || '').toLowerCase()) ? 'The examination has reached a terminal status, but this response contains no correlation payload. Six engine responses do not by themselves confirm that cross-engine correlation was performed.' : 'The consolidated report has not yet been returned by the API. It remains pending while the examination is processing.'}</p></div> : <>
               <div className="metric-row"><div><span className="field-label">RESULTS RECEIVED</span><strong>{correlation.summary?.received_engine_count ?? received}<small> / {correlation.summary?.expected_engine_count ?? expected.length}</small></strong></div><div><span className="field-label">OBSERVATION CONFLICTS</span><strong>{correlation.summary?.conflict_count ?? correlation.conflicts?.length ?? 0}</strong></div><div><span className="field-label">SCORES AGGREGATED</span><strong>{correlation.summary?.scores_aggregated === true ? 'Yes' : 'No'}</strong></div></div>
               {correlation.missing_engines?.length > 0 && <p className="review-line"><b>Missing engines:</b> {correlation.missing_engines.join(', ')}</p>}
               {correlation.failed_engines?.length > 0 && <p className="review-line"><b>Failed engines:</b> {correlation.failed_engines.join(', ')}</p>}
