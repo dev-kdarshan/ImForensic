@@ -269,10 +269,5 @@ export default function App() {
       </>}
       <footer className="page-footer">IMFORENSIC · DIGITAL IMAGE EXAMINATION <span>Internal analytical workspace · Verify findings against source evidence</span></footer>
     </main>
-<<<<<<< HEAD
-  );
-}
-=======
   </div>;
 }
->>>>>>> bb5414aa2235a5dc95d33fafcf30f862059b1965
