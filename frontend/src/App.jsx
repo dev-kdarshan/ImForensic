@@ -193,6 +193,7 @@ export default function App() {
       write(String(index + 1).padStart(2, '0') + '  ' + meta[1], 10, true);
       write('Execution status: ' + (item?.status || 'No response received'), 8, true);
       write(statusMessage(item), 8);
+      if (id === 'ai-content-detection') { const assessment = getAiAssessment(item); write('AI-generation assessment: ' + assessment.label, 8, true); write(assessment.detail, 8); }
       const result = rawFor(item);
       const normalized = result.findings ?? result.observations ?? result.summary;
       if (Array.isArray(normalized) && normalized.length) normalized.slice(0, 8).forEach(f => write('• ' + (typeof f === 'string' ? f : f.description || f.message || f.name || 'Observation recorded'), 8));
